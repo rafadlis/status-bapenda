@@ -72,6 +72,6 @@ async function LiveStatus({ range }: { range: ReturnType<typeof getHistoryRange>
     <div className="reference-history-action"><Link href="/history">Lihat riwayat pembaruan</Link></div>
 
     {active.length > 0 && <section className="reference-updates" aria-labelledby="updates-title"><div className="reference-updates-heading"><h2 id="updates-title">Pembaruan terkini</h2><Link href="/history">Semua riwayat</Link></div><div>{active.map((incident) => <IncidentRow incident={incident} key={incident.id} />)}</div></section>}
-    <p className="reference-disclaimer">Halaman ini memantau ketersediaan SAPADA, Struk Berhadiah, Simpul PAD, dan situs Bapenda Kabupaten Garut. Pemeriksaan dijadwalkan setiap lima menit. Status menjadi belum diketahui jika tidak ada hasil baru selama 20 menit.</p>
+    <p className="reference-disclaimer">Halaman ini memantau ketersediaan SAPADA, Struk Berhadiah, Simpul PAD, SOP Studio, Bapenda Belajar, dan situs Bapenda Kabupaten Garut. Pemeriksaan dijadwalkan setiap lima menit. Status menjadi belum diketahui jika tidak ada hasil baru selama 20 menit.</p>
   </main>;
 }

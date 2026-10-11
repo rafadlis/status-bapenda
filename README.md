@@ -1,6 +1,6 @@
 # Status Layanan Bapenda Garut
 
-Public status page for four Bapenda Kabupaten Garut services: SAPADA, Struk Berhadiah, Simpul PAD, and the main Bapenda website. It is deployed on Vercel with Neon Postgres at `https://status.bapenda.garutkab.go.id`.
+Public status page for six Bapenda Kabupaten Garut services: SAPADA, Struk Berhadiah, Simpul PAD, SOP Studio, Bapenda Belajar (LMS), and the main Bapenda website. It is deployed on Vercel with Neon Postgres at `https://status.bapenda.garutkab.go.id`.
 
 The page shows the latest status for each service and history ranges from 30 minutes to 90 days. The default is 30 days. Each bar represents one minute, hour, or Jakarta calendar day according to the selected range. Green bars have only successful checks, yellow bars have both successful and failed checks, red bars have only failed checks, and gray bars have no recorded check. Hover or select a bar to see its exact period, failure count, latest error time, and reason. Its detail link lists every check in that period with exact timestamps. The displayed uptime is estimated from recorded checks, not continuous observation. Open pages refresh every minute while visible. When a service has no result for 20 minutes, its state becomes unknown.
 
@@ -21,7 +21,7 @@ The page shows the latest status for each service and history ranges from 30 min
 
 ## Monitoring and updates
 
-The GitHub Actions workflow calls `POST /api/check` on a five-minute schedule. Configure `MONITOR_TOKEN` as both a GitHub Actions repository secret and a Vercel environment variable, and set the `STATUS_URL` repository variable to the Vercel production URL. Vercel Cron calls `GET /api/check` through 96 daily jobs as a backup; set `CRON_SECRET` in Vercel production environment variables. A request checks all four public services and the SAPADA integrations concurrently, records each result in Neon, and returns the results as JSON. The workflow can also be triggered manually.
+The GitHub Actions workflow calls `POST /api/check` on a five-minute schedule. Configure `MONITOR_TOKEN` as both a GitHub Actions repository secret and a Vercel environment variable, and set the `STATUS_URL` repository variable to the Vercel production URL. Vercel Cron calls `GET /api/check` through 96 daily jobs as a backup; set `CRON_SECRET` in Vercel production environment variables. A request checks all six public services and the SAPADA integrations concurrently, records each result in Neon, and returns the results as JSON. The workflow can also be triggered manually.
 
 ### WhatsApp failure alerts
 

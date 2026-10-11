@@ -21,6 +21,20 @@ export const services = [
     repository: "https://github.com/rafadlis/simpul-pad",
   },
   {
+    key: "sop-studio",
+    name: "SOP Studio",
+    host: "sop.bapenda.garutkab.go.id",
+    url: "https://sop.bapenda.garutkab.go.id/",
+    repository: "https://github.com/rafadlis/sop-studio",
+  },
+  {
+    key: "lms-bapenda",
+    name: "Bapenda Belajar",
+    host: "lms.bapenda.garutkab.go.id",
+    url: "https://lms.bapenda.garutkab.go.id/",
+    repository: "https://github.com/rafadlis/lms-bapenda",
+  },
+  {
     key: "bapenda",
     name: "Bapenda Garut",
     host: "bapenda.garutkab.go.id",

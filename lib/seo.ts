@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const siteUrl = "https://status.bapenda.garutkab.go.id";
 export const siteName = "Status Layanan Bapenda Garut";
-export const siteDescription = "Pantau status SAPADA, Struk Berhadiah, Simpul PAD, dan situs Bapenda Garut. Lihat ketersediaan layanan, gangguan, serta jadwal pemeliharaan.";
+export const siteDescription = "Pantau status SAPADA, Struk Berhadiah, Simpul PAD, SOP Studio, Bapenda Belajar, dan situs Bapenda Garut. Lihat ketersediaan layanan, gangguan, serta jadwal pemeliharaan.";
 
 export function absoluteUrl(path: string) {
   return new URL(path, siteUrl).toString();
