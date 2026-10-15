@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "incremental": false },
+  "files": [
+    "node_modules/next/types/global.d.ts",
+    "app/api/check/route.ts", "app/api/status/route.ts", "app/checks/page.tsx", "app/incidents/[id]/page.tsx",
+    "components/history-chart.tsx", "components/history-chart-skeleton.tsx", "components/component-disclosure.tsx",
+    "components/admin-component-checkboxes.tsx", "components/admin-incident-dialog.tsx", "components/admin-incident-target.tsx",
+    "lib/simpul-pad-checks.ts", "lib/simpul-pad-checks.test.ts", "lib/simpul-components.test.tsx",
+    "lib/component-checks.test.ts", "lib/status-feed.test.ts", "lib/status-feed-query.test.ts",
+    "lib/incident-components.test.ts", "lib/automatic-incidents.test.ts", "lib/payment-components.test.ts", "lib/whatsapp-alerts.test.ts",
+    "lib/status-history-coverage.test.ts", "lib/status-rollup.test.ts", "lib/qris-monitoring.test.tsx"
+  ],
+  "include": []
+}

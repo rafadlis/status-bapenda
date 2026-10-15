@@ -9,6 +9,17 @@ const failures = [
 const checkedAt = new Date("2026-09-30T07:00:00.000Z");
 const config = { endpoint: "https://oca.example.test/send", token: "secret", templateCode: "marketing:peringatan_gangguan_layanan_bapenda" };
 
+test("Simpul alerts identify the service for payment names shared with SAPADA", () => {
+  const [names, , reasons] = alertBodyValues([
+    { serviceKey: "sapada-va-bjb", statusCode: null },
+    { serviceKey: "simpul-pad-va", statusCode: null },
+    { serviceKey: "simpul-pad-login", statusCode: 503 },
+  ], checkedAt);
+  assert.equal(names, "Virtual Account BJB, Simpul PAD · Virtual Account BJB, Simpul PAD · Login");
+  assert.match(reasons, /Simpul PAD · Virtual Account BJB: tidak dapat diakses/);
+  assert.match(reasons, /Simpul PAD · Login: HTTP 503/);
+});
+
 test("recipient configuration normalizes Indonesian numbers and removes duplicates", () => {
   assert.deepEqual(parseAlertRecipients("0813-1526-5538, +6281315265538\n628123456789"), ["6281315265538", "628123456789"]);
   assert.throws(() => parseAlertRecipients("6281315265538,not-a-phone"));

@@ -13,7 +13,8 @@ test("SAPADA parent history includes periods recorded by any component", { skip:
     assert.equal(data.dataError, false);
     const parent = data.services[0];
     for (let index = 0; index < range.buckets; index++) {
-      const recorded = data.components.some((component) => component.history[index].count > 0);
+      const recorded = data.components.some((component) => (component.service.key === "sapada"
+        || ("parentKey" in component.service && component.service.parentKey === "sapada")) && component.history[index].count > 0);
       assert.equal(parent.history[index].count > 0, recorded, `${range.key}: missing history in bucket ${index}`);
       assert.ok(parent.history[index].failedCount <= parent.history[index].count);
       assert.ok((parent.history[index].partialCount ?? 0) <= parent.history[index].count);

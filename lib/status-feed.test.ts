@@ -10,6 +10,17 @@ const healthy = () =>
     ok: true,
   }));
 
+test("Simpul outages do not change either version of SAPADA's public feed", () => {
+  const checks = [...healthy(), ...["simpul-pad", "simpul-pad-login", "simpul-pad-qris", "simpul-pad-va", "simpul-pad-api"]
+    .map((serviceKey) => ({ serviceKey, checkedAt: now, ok: false }))];
+  for (const version of [1, 2] as const) {
+    const feed = buildStatusFeed(checks, [], now, true, version);
+    assert.equal(feed.service.state, "operational");
+    assert.ok(feed.components.every((component) => component.key.startsWith("sapada")));
+    assert.ok(feed.paymentMethods.every((component) => component.key.startsWith("sapada")));
+  }
+});
+
 test("version 1 feed keeps five monitors and rolls up independent payment failures", () => {
   const checks = healthy();
   assert.equal(buildStatusFeed(checks, [], now).service.state, "operational");

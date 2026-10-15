@@ -3,8 +3,8 @@ import { getDb } from "./db";
 import { checks, incidents, incidentUpdates } from "./db/schema";
 import { defaultHistoryRange, getHistoryRange, getHistoryWindow } from "./history-range";
 import { services } from "./services";
-import { components, monitoredComponents, sapadaHistoryKeys, skippedComponentKeys } from "./components";
-import { rollupSapadaStatus } from "./status-rollup";
+import { components, getMonitoredServiceKeys, getServiceComponents, getServiceHistoryKeys, skippedComponentKeys } from "./components";
+import { rollupServiceStatus } from "./status-rollup";
 
 export type PublicStatus = "operational" | "degraded" | "unknown";
 type Check = typeof checks.$inferSelect;
@@ -32,9 +32,13 @@ export type StatusData = {
 
 const monitors = [...services, ...components] as const;
 
-export function countMonitoredSapadaChecks() {
-  const keys = ["sapada", ...monitoredComponents.map((component) => component.key)];
+export function countMonitoredServiceChecks(serviceKey: string) {
+  const keys = getMonitoredServiceKeys(serviceKey);
   return sql<number>`count(distinct ${checks.serviceKey}) filter (where ${inArray(checks.serviceKey, keys)})::integer`;
+}
+
+export function countMonitoredSapadaChecks() {
+  return countMonitoredServiceChecks("sapada");
 }
 
 function emptyMonitors(bucketCount: number): ServiceStatus[] {
@@ -47,20 +51,25 @@ function emptyMonitors(bucketCount: number): ServiceStatus[] {
   }));
 }
 
-function groupMonitors(monitors: ServiceStatus[], overallHistory: ServiceHistoryBucket[]) {
+function groupMonitors(monitors: ServiceStatus[], overallHistories: Map<string, ServiceHistoryBucket[]> = new Map()) {
   const rawServices = monitors.slice(0, services.length);
   const integrations = monitors.slice(services.length);
-  const site = rawServices[0];
   return {
-    services: [rollupSapadaStatus(site, integrations, overallHistory), ...rawServices.slice(1)],
-    components: [{ ...site, displayName: "Situs SAPADA" }, ...integrations],
+    services: rawServices.map((site) => {
+      const children = integrations.filter((component) => "parentKey" in component.service && component.service.parentKey === site.service.key);
+      return children.length ? rollupServiceStatus(site, children, overallHistories.get(site.service.key) ?? site.history) : site;
+    }),
+    components: rawServices.flatMap((site) => {
+      const children = integrations.filter((component) => "parentKey" in component.service && component.service.parentKey === site.service.key);
+      return children.length ? [{ ...site, displayName: `Situs ${site.service.name}` }, ...children] : [];
+    }),
   };
 }
 
 export async function getStatusData(range: HistoryRange | null = defaultHistoryRange, now = new Date()): Promise<StatusData> {
   if (!process.env.DATABASE_URL) {
     const empty = emptyMonitors(range?.buckets ?? 0);
-    return { state: "unknown", ...groupMonitors(empty, empty[0].history), incidents: [], dataError: false };
+    return { state: "unknown", ...groupMonitors(empty), incidents: [], dataError: false };
   }
 
   try {
@@ -69,15 +78,26 @@ export async function getStatusData(range: HistoryRange | null = defaultHistoryR
     const since = window?.start ?? now;
     const bucketMs = window?.bucketMs ?? 0;
     const bucketIndex = sql<number>`floor((extract(epoch from ${checks.checkedAt}) * 1000 - ${since.getTime()}) / ${bucketMs || 1})::integer`;
-    const sapadaKeys = sapadaHistoryKeys;
-    const runs = db.select({
-      checkedAt: checks.checkedAt,
-      bucketIndex: bucketIndex.as("bucket_index"),
-      observed: countMonitoredSapadaChecks().as("observed"),
-      failed: sql<boolean>`bool_or(${checks.ok} = false)`.as("failed"),
-      latestFailureId: sql<number | null>`(array_agg(${checks.id} order by ${checks.id} desc) filter (where ${checks.ok} = false))[1]`.as("latest_failure_id"),
-    }).from(checks).where(and(inArray(checks.serviceKey, sapadaKeys), gte(checks.checkedAt, since), lt(checks.checkedAt, now)))
-      .groupBy(checks.checkedAt).as("sapada_runs");
+    const groupedServices = services.filter((service) => getServiceComponents(service.key).length > 0);
+    const overallHistoryQuery = async (serviceKey: string) => {
+      if (!range) return [];
+      const runs = db.select({
+        checkedAt: checks.checkedAt,
+        bucketIndex: bucketIndex.as("bucket_index"),
+        observed: countMonitoredServiceChecks(serviceKey).as("observed"),
+        failed: sql<boolean>`bool_or(${checks.ok} = false)`.as("failed"),
+        latestFailureId: sql<number | null>`(array_agg(${checks.id} order by ${checks.id} desc) filter (where ${checks.ok} = false))[1]`.as("latest_failure_id"),
+      }).from(checks).where(and(inArray(checks.serviceKey, getServiceHistoryKeys(serviceKey)), gte(checks.checkedAt, since), lt(checks.checkedAt, now)))
+        .groupBy(checks.checkedAt).as("service_runs");
+      const rows = await db.select({
+        bucketIndex: runs.bucketIndex,
+        count: sql<number>`count(*)::integer`,
+        failedCount: sql<number>`count(*) filter (where ${runs.failed})::integer`,
+        partialCount: sql<number>`count(*) filter (where ${runs.observed} < ${getMonitoredServiceKeys(serviceKey).length})::integer`,
+        latestFailureId: sql<number | null>`(array_agg(${runs.latestFailureId} order by ${runs.checkedAt} desc) filter (where ${runs.failed}))[1]`,
+      }).from(runs).groupBy(runs.bucketIndex);
+      return rows.map((row) => ({ ...row, serviceKey }));
+    };
     const [latestRows, aggregateRows, overallRows, recentIncidents] = await Promise.all([
       Promise.all(monitors.map((service) => skippedComponentKeys.includes(service.key) ? Promise.resolve([] as Check[]) : db.select().from(checks)
         .where(eq(checks.serviceKey, service.key)).orderBy(desc(checks.checkedAt), desc(checks.id)).limit(1))),
@@ -91,15 +111,7 @@ export async function getStatusData(range: HistoryRange | null = defaultHistoryR
         .groupBy(checks.serviceKey, sql`2`) : Promise.resolve([] as {
           serviceKey: string; bucketIndex: number; count: number; failedCount: number; latestFailureId: number | null;
         }[]),
-      range ? db.select({
-        bucketIndex: runs.bucketIndex,
-        count: sql<number>`count(*)::integer`,
-        failedCount: sql<number>`count(*) filter (where ${runs.failed})::integer`,
-        partialCount: sql<number>`count(*) filter (where ${runs.observed} < ${monitoredComponents.length + 1})::integer`,
-        latestFailureId: sql<number | null>`(array_agg(${runs.latestFailureId} order by ${runs.checkedAt} desc) filter (where ${runs.failed}))[1]`,
-      }).from(runs).groupBy(runs.bucketIndex) : Promise.resolve([] as {
-        bucketIndex: number; count: number; failedCount: number; partialCount: number; latestFailureId: number | null;
-      }[]),
+      Promise.all(groupedServices.map((service) => overallHistoryQuery(service.key))).then((rows) => rows.flat()),
       db.select().from(incidents).orderBy(desc(incidents.createdAt)).limit(30),
     ]);
     const failureIds = [...aggregateRows, ...overallRows].flatMap((row) => row.latestFailureId === null ? [] : [row.latestFailureId]);
@@ -126,14 +138,16 @@ export async function getStatusData(range: HistoryRange | null = defaultHistoryR
       const uptime = total ? Math.round(((total - failed) / total) * 10000) / 100 : null;
       return { service, state, latest, history, uptime };
     });
-    const overallHistory: ServiceHistoryBucket[] = Array.from({ length: range?.buckets ?? 0 }, () => ({ count: 0, failedCount: 0, latestFailure: null }));
+    const overallHistories = new Map<string, ServiceHistoryBucket[]>(groupedServices.map((service) => [service.key,
+      Array.from({ length: range?.buckets ?? 0 }, () => ({ count: 0, failedCount: 0, latestFailure: null }))]));
     for (const row of overallRows) {
+      const overallHistory = overallHistories.get(row.serviceKey)!;
       if (row.bucketIndex < 0 || row.bucketIndex >= overallHistory.length) continue;
       overallHistory[row.bucketIndex] = { count: row.count, failedCount: row.failedCount,
         partialCount: row.partialCount,
         latestFailure: row.latestFailureId === null ? null : failureById.get(row.latestFailureId) ?? null };
     }
-    const grouped = groupMonitors(monitorStatuses, overallHistory);
+    const grouped = groupMonitors(monitorStatuses, overallHistories);
     const state: PublicStatus = grouped.services.some((service) => service.state === "degraded") ? "degraded"
       : grouped.services.some((service) => service.state === "unknown") ? "unknown" : "operational";
     return { state, ...grouped, incidents: recentIncidents.map((incident) => ({
@@ -143,7 +157,7 @@ export async function getStatusData(range: HistoryRange | null = defaultHistoryR
   } catch (error) {
     console.error("Failed to load status data", error);
     const empty = emptyMonitors(range?.buckets ?? 0);
-    return { state: "unknown", ...groupMonitors(empty, empty[0].history), incidents: [], dataError: true };
+    return { state: "unknown", ...groupMonitors(empty), incidents: [], dataError: true };
   }
 }
 

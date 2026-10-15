@@ -1,20 +1,28 @@
-import { components, legacyPaymentComponent, legacyQrisComponent, skippedComponentKeys } from "@/lib/components";
+import { getServiceComponents, legacyPaymentComponent, legacyQrisComponent, skippedComponentKeys } from "@/lib/components";
+import { getService, services } from "@/lib/services";
 
 export function incidentAffectsMonitoring(incident: { serviceKey: string; affectedComponentKeys: string[] | null }) {
-  return incident.serviceKey !== "sapada" || !incident.affectedComponentKeys?.length
+  return !getIncidentComponents(incident.serviceKey).length || !incident.affectedComponentKeys?.length
     || incident.affectedComponentKeys.some((key) => !skippedComponentKeys.includes(key));
 }
 
-export const sapadaIncidentComponents = [
-  { key: "sapada", name: "Situs SAPADA" },
-  ...components.filter((component) => component.parentKey === "sapada"),
-];
+export function getIncidentComponents(serviceKey: string) {
+  const service = getService(serviceKey);
+  const children = getServiceComponents(serviceKey);
+  return service && children.length
+    ? [{ key: service.key, name: `Situs ${service.name}` }, ...children]
+    : [];
+}
 
-const historicalIncidentComponents = [...sapadaIncidentComponents, legacyPaymentComponent, legacyQrisComponent];
-const componentKeys = new Set(historicalIncidentComponents.map((component) => component.key));
+export const sapadaIncidentComponents = getIncidentComponents("sapada");
+
+const historicalIncidentComponents = [...services.flatMap((service) => getIncidentComponents(service.key)), legacyPaymentComponent, legacyQrisComponent];
 
 export function parseAffectedComponentKeys(serviceKey: string, values: FormDataEntryValue[]) {
-  if (serviceKey !== "sapada") return values.length === 0 ? null : undefined;
+  const choices = getIncidentComponents(serviceKey);
+  if (!choices.length) return values.length === 0 ? null : undefined;
+  const allowed = serviceKey === "sapada" ? [...choices, legacyPaymentComponent, legacyQrisComponent] : choices;
+  const componentKeys = new Set<string>(allowed.map((component) => component.key));
   const keys = values.map(String);
   if (keys.length === 0 || keys.length > componentKeys.size || new Set(keys).size !== keys.length || keys.some((key) => !componentKeys.has(key))) {
     return undefined;

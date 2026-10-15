@@ -21,10 +21,10 @@ export function ComponentDisclosure({ children }: { children: ReactNode }) {
   </DisclosureContext.Provider>;
 }
 
-export function ComponentDisclosureToggle({ count }: { count: number }) {
+export function ComponentDisclosureToggle({ count, serviceName = "SAPADA" }: { count: number; serviceName?: string }) {
   const { open, panelId, toggle } = useDisclosure();
   return <button type="button" className="reference-components-toggle" aria-controls={panelId} aria-expanded={open}
-    aria-label={`${open ? "Sembunyikan" : "Tampilkan"} ${count} komponen SAPADA`} onClick={toggle}>
+    aria-label={`${open ? "Sembunyikan" : "Tampilkan"} ${count} komponen ${serviceName}`} onClick={toggle}>
     <span>{count} komponen</span>
     <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} aria-hidden="true" />
   </button>;

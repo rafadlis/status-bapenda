@@ -13,7 +13,7 @@ test("legacy QRIS observations retain history but cannot complete current monito
     await client.exec(`CREATE TABLE checks (id serial primary key, service_key text, checked_at timestamptz,
       ok boolean, status_code integer, latency_ms integer, error text)`);
     const db = drizzle({ client });
-    const currentKeys = ["sapada", ...monitoredComponents.map((component) => component.key)];
+    const currentKeys = ["sapada", ...monitoredComponents.filter((component) => component.parentKey === "sapada").map((component) => component.key)];
     const legacyKeys = currentKeys.map((key) => key === "sapada-qris-generate" ? "sapada-qris" : key);
     const legacyAt = new Date("2026-10-07T08:00:00Z");
     const currentAt = new Date("2026-10-07T08:05:00Z");

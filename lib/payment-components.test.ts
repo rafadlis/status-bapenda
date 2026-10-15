@@ -3,13 +3,13 @@ import { test } from "node:test";
 import { PGlite } from "@electric-sql/pglite";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { buildIncidentObservationQuery, buildIncidentPublicationQuery } from "./automatic-incidents";
-import { components, getComponent, monitoredPaymentComponentKeys, paymentComponentKeys, sapadaHistoryKeys } from "./components";
+import { components, getComponent, monitoredPaymentComponentKeys, paymentComponentKeys, sapadaComponents, sapadaHistoryKeys } from "./components";
 import { alertFailureName } from "./whatsapp-alerts";
 
 test("current payment labels and historical keys remain distinct", () => {
   assert.deepEqual(components.filter((item) => (paymentComponentKeys as readonly string[]).includes(item.key)).map((item) => item.name),
     ["Generate QRIS", "Cek Status QRIS", "Virtual Account BJB", "Kode Bayar"]);
-  assert.equal(components.length, 7);
+  assert.equal(sapadaComponents.length, 7);
   assert.equal(components.some((item) => String(item.key) === "sapada-payment"), false);
   assert.equal(getComponent("sapada-payment")?.name, "Payment API");
   assert.ok(sapadaHistoryKeys.includes("sapada-payment"));

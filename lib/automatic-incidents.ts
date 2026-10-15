@@ -2,7 +2,7 @@ import { neon } from "@neondatabase/serverless";
 import { sql } from "drizzle-orm";
 import { PgDialect } from "drizzle-orm/pg-core";
 import { services } from "@/lib/services";
-import { sapadaIncidentComponents } from "@/lib/incident-components";
+import { getIncidentComponents } from "@/lib/incident-components";
 import { legacyPaymentComponent, legacyQrisComponent, paymentComponentKeys, skippedComponentKeys } from "@/lib/components";
 
 export const automaticIncidentPolicy = {
@@ -14,9 +14,13 @@ export const automaticIncidentPolicy = {
 } as const;
 
 type Observation = { serviceKey: string; ok: boolean };
-const catalog = services.flatMap<{ key: string; parent: string; name: string; parentName: string }>((service) => service.key === "sapada"
-  ? sapadaIncidentComponents.filter((component) => !skippedComponentKeys.includes(component.key)).map((component) => ({ key: component.key, parent: service.key, name: component.name, parentName: service.name }))
-  : [{ key: service.key, parent: service.key, name: service.name, parentName: service.name }]);
+const componentServices = services.filter((service) => getIncidentComponents(service.key).length > 0);
+const catalog = services.flatMap<{ key: string; parent: string; name: string; parentName: string }>((service) => {
+  const choices = getIncidentComponents(service.key);
+  return choices.length
+    ? choices.filter((component) => !skippedComponentKeys.includes(component.key)).map((component) => ({ key: component.key, parent: service.key, name: component.name, parentName: service.name }))
+    : [{ key: service.key, parent: service.key, name: service.name, parentName: service.name }];
+});
 
 // All schedulers take the same transaction lock before reading or changing incident state.
 export const automaticIncidentLock = sql`SELECT pg_advisory_xact_lock(742901, 10)`;
@@ -77,7 +81,7 @@ export function buildIncidentPublicationQuery(at: Date) {
       FROM pending WHERE existing_id IS NULL GROUP BY parent, parent_name
     ), created AS (
       INSERT INTO incidents (service_key, affected_component_keys, title, message, kind, state, created_at, updated_at, automatic, title_review_required)
-      SELECT parent, CASE WHEN parent = 'sapada' THEN keys END,
+      SELECT parent, CASE WHEN parent IN (${sql.join(componentServices.map((service) => sql`${service.key}`), sql`, `)}) THEN keys END,
         'Gangguan terdeteksi pada ' || parent_name,
         'Pemantauan otomatis mencatat kegagalan berulang selama sedikitnya 10 menit pada ' || names || '. Penyebab belum dikonfirmasi. Pengelola perlu memeriksa gangguan dan memperbarui informasi ini.',
         'incident', 'investigating', started_at, ${at}::timestamptz, true, true FROM grouped

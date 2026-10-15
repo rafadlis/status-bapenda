@@ -3,6 +3,7 @@ import { checks } from "@/lib/db/schema";
 import { checkTimeoutMs } from "@/lib/check-result";
 import { services } from "@/lib/services";
 import { runComponentChecks } from "@/lib/component-checks";
+import { runSimpulPadChecks } from "@/lib/simpul-pad-checks";
 import { processWhatsappAlerts } from "@/lib/whatsapp-alerts";
 import { processAutomaticIncidents } from "@/lib/automatic-incidents";
 import { revalidateTag } from "next/cache";
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
 }
 
 async function runCheck() {
-  const [serviceResults, componentResults] = await Promise.all([Promise.all(services.map(async (service) => {
+  const [serviceResults, componentResults, simpulPadResults] = await Promise.all([Promise.all(services.map(async (service) => {
     const started = performance.now();
     let ok = false;
     let statusCode: number | null = null;
@@ -46,8 +47,8 @@ async function runCheck() {
       error = cause instanceof Error ? cause.message.slice(0, 300) : "Unknown network error";
     }
     return { serviceKey: service.key, ok, statusCode, latencyMs: Math.round(performance.now() - started), error };
-  })), runComponentChecks()]);
-  const results = [...serviceResults, ...componentResults];
+  })), runComponentChecks(), runSimpulPadChecks()]);
+  const results = [...serviceResults, ...componentResults, ...simpulPadResults];
   const checkedAt = new Date();
   try {
     await getDb().insert(checks).values(results.map((result) => ({ ...result, checkedAt })));

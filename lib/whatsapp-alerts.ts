@@ -41,8 +41,12 @@ export function parseAlertRecipient(raw: string) {
 }
 
 export function alertFailureName(key: string) {
-  return services.find((service) => service.key === key)?.name
-    ?? getComponent(key)?.name ?? key;
+  const service = services.find((service) => service.key === key);
+  if (service) return service.name;
+  const component = getComponent(key);
+  if (!component) return key;
+  const parent = services.find((entry) => entry.key === component.parentKey);
+  return component.parentKey === "sapada" ? component.name : `${parent?.name ?? component.parentKey} · ${component.name}`;
 }
 
 export function alertBodyValues(failures: AlertFailure[], checkedAt: Date) {

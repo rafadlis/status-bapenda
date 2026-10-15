@@ -11,7 +11,7 @@ import { checks } from "@/lib/db/schema";
 import { defaultHistoryRange, getHistoryRange } from "@/lib/history-range";
 import { formatJakarta } from "@/lib/status";
 import { getService, services } from "@/lib/services";
-import { getComponent, sapadaHistoryKeys } from "@/lib/components";
+import { getComponent, getServiceComponents, getServiceHistoryKeys } from "@/lib/components";
 
 export const metadata: Metadata = {
   title: "Detail pemeriksaan",
@@ -41,7 +41,7 @@ async function ChecksContent({ searchParams }: ChecksProps) {
   const range = getHistoryRange(params.range);
   const requestedService = single(params.service);
   const service = requestedService === undefined ? services[0] : getService(requestedService) ?? getComponent(requestedService);
-  const overall = service?.key === "sapada" && single(params.view) === "overall";
+  const overall = Boolean(service && getServiceComponents(service.key).length > 0 && single(params.view) === "overall");
   const from = Number(single(params.from));
   const to = Number(single(params.to));
   const requestedPage = Number(single(params.page) ?? "1");
@@ -57,9 +57,8 @@ async function ChecksContent({ searchParams }: ChecksProps) {
   if (valid && service) {
     try {
       const db = getDb();
-      const sapadaKeys = sapadaHistoryKeys;
       const result = await db.select().from(checks)
-        .where(and(overall ? inArray(checks.serviceKey, sapadaKeys) : eq(checks.serviceKey, service.key), gte(checks.checkedAt, new Date(from)), lt(checks.checkedAt, new Date(to))))
+        .where(and(overall ? inArray(checks.serviceKey, getServiceHistoryKeys(service.key)) : eq(checks.serviceKey, service.key), gte(checks.checkedAt, new Date(from)), lt(checks.checkedAt, new Date(to))))
         .orderBy(desc(checks.checkedAt), desc(checks.id))
         .limit(pageSize + 1).offset((requestedPage - 1) * pageSize);
       hasNext = result.length > pageSize;
@@ -79,7 +78,7 @@ async function ChecksContent({ searchParams }: ChecksProps) {
       <main className="site-width check-detail-page">
         <Link className="back-link" href={backHref}>← Kembali ke status</Link>
         <p className="kicker">Riwayat pemantauan</p>
-        <h1>Detail pemeriksaan {overall ? "SAPADA dan komponennya" : service?.name}</h1>
+        <h1>Detail pemeriksaan {overall ? `${service?.name} dan komponennya` : service?.name}</h1>
         {period && <p className="check-period">{period}</p>}
         {!valid ? <p className="check-message">Rentang waktu tidak valid. Pilih batang riwayat dari halaman status.</p>
           : unavailable ? <p className="check-message">Riwayat belum dapat dimuat. Coba lagi nanti.</p>
@@ -87,7 +86,7 @@ async function ChecksContent({ searchParams }: ChecksProps) {
               : <div className="check-list">{rows.map((check) => (
                 <article className="check-row" key={check.id}>
                   <div><time dateTime={check.checkedAt.toISOString()}>{formatJakarta(check.checkedAt, { dateStyle: "medium", timeStyle: "medium" })} WIB</time><span className={`check-result ${check.ok ? "check-ok" : "check-failed"}`}>{check.ok ? "Berhasil" : "Gagal"}</span></div>
-                  <p>{overall && <><strong>{getComponent(check.serviceKey)?.name ?? "Situs SAPADA"}</strong> · </>}{formatCheckResult(check)}</p>
+                  <p>{overall && <><strong>{getComponent(check.serviceKey)?.name ?? `Situs ${service?.name}`}</strong> · </>}{formatCheckResult(check)}</p>
                 </article>
               ))}</div>}
         {valid && !unavailable && (requestedPage > 1 || hasNext) && <nav className="check-pagination" aria-label="Halaman riwayat pemeriksaan">

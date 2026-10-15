@@ -19,16 +19,20 @@ export function HistoryChart({ services, components, selectedRange, now }: {
   return <section className="reference-system-card" aria-labelledby="system-status-title">
     <div className="reference-system-head"><h2 id="system-status-title">Status sistem</h2><HistoryRangeMenu key={range.key} selectedRange={range.key} /></div>
     <div className="reference-service-legend"><div className="reference-legend" aria-label="Legenda pemeriksaan">{historyBarLegend.map((item) => <span key={item.state}><i className={`reference-bar-${item.state}`} aria-hidden="true" />{item.label}</span>)}</div></div>
-    {services.map((service) => service.service.key === "sapada"
-      ? <ComponentDisclosure key={service.service.key}>
-        <ServiceHistoryRow service={service} range={range} now={now} afterName={<ComponentDisclosureToggle count={components.length} />} />
-        <ComponentDisclosurePanel>
-          {components.map((component) => <ServiceHistoryRow key={component.service.key} service={component} range={range} now={now} />)}
-        </ComponentDisclosurePanel>
-      </ComponentDisclosure>
-      : <div className="reference-service-group" key={service.service.key}>
-        <ServiceHistoryRow service={service} range={range} now={now} />
-      </div>)}
+    {services.map((service) => {
+      const serviceComponents = components.filter((component) => component.service.key === service.service.key
+        || ("parentKey" in component.service && component.service.parentKey === service.service.key));
+      return serviceComponents.length > 0
+        ? <ComponentDisclosure key={service.service.key}>
+          <ServiceHistoryRow service={service} range={range} now={now} afterName={<ComponentDisclosureToggle count={serviceComponents.length} serviceName={service.service.name} />} />
+          <ComponentDisclosurePanel>
+            {serviceComponents.map((component) => <ServiceHistoryRow key={component.service.key} service={component} range={range} now={now} />)}
+          </ComponentDisclosurePanel>
+        </ComponentDisclosure>
+        : <div className="reference-service-group" key={service.service.key}>
+          <ServiceHistoryRow service={service} range={range} now={now} />
+        </div>;
+    })}
   </section>;
 }
 

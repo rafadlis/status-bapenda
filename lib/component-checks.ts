@@ -1,4 +1,4 @@
-import { components, legacyPaymentComponent, legacyQrisComponent, monitoredComponents, skippedComponentKeys } from "./components";
+import { sapadaComponents as components, legacyPaymentComponent, legacyQrisComponent, skippedComponentKeys } from "./components";
 import { checkTimeoutMs } from "./check-result";
 import { services } from "./services";
 import { healthAuthorization, integrationHealthPath } from "./integration-signature";
@@ -56,7 +56,7 @@ export async function runComponentChecks() {
       error: result.ok ? null : "Integration unavailable",
     }));
   } catch {
-    return monitoredComponents.map((component) => ({
+    return components.filter((component) => !skippedComponentKeys.includes(component.key)).map((component) => ({
       serviceKey: component.key,
       ok: false,
       statusCode: null,

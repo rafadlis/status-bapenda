@@ -1,6 +1,6 @@
 import type { ServiceStatus, ServiceHistoryBucket, PublicStatus } from "./status";
 
-export function rollupSapadaStatus(site: ServiceStatus, components: ServiceStatus[], history: ServiceHistoryBucket[]): ServiceStatus {
+export function rollupServiceStatus(site: ServiceStatus, components: ServiceStatus[], history: ServiceHistoryBucket[]): ServiceStatus {
   const monitors = [site, ...components].filter((monitor) => monitor.state !== "skipped");
   const state: PublicStatus = monitors.some((monitor) => monitor.state === "degraded") ? "degraded"
     : monitors.some((monitor) => monitor.state === "unknown") ? "unknown" : "operational";
@@ -11,3 +11,5 @@ export function rollupSapadaStatus(site: ServiceStatus, components: ServiceStatu
     !current || (monitor.latest && monitor.latest.checkedAt > current.checkedAt) ? monitor.latest : current, null);
   return { ...site, state, history, uptime, latest, isOverall: true };
 }
+
+export const rollupSapadaStatus = rollupServiceStatus;

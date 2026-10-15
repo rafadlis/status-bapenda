@@ -1,4 +1,4 @@
-import { components, legacyPaymentComponent, legacyQrisComponent, monitoredPaymentComponentKeys, paymentComponentKeys, skippedComponentKeys } from "./components";
+import { sapadaComponents as components, legacyPaymentComponent, legacyQrisComponent, monitoredPaymentComponentKeys, paymentComponentKeys, skippedComponentKeys } from "./components";
 import { isIncidentKind, isValidIncidentState } from "./incident";
 
 const monitorKeys = ["sapada", ...components.map((item) => item.key)];
