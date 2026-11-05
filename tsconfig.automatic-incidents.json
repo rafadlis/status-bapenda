@@ -3,8 +3,12 @@
   "compilerOptions": { "incremental": false },
   "files": [
     "lib/automatic-incidents.ts", "lib/automatic-incidents.test.ts",
-    "app/api/check/route.ts", "app/api/admin/incidents/[id]/route.ts",
-    "components/admin-incident-dialog.tsx", "app/admin/page.tsx"
+    "lib/incident-management.ts", "lib/incident-period.ts", "lib/incident-period.test.ts",
+    "app/api/check/route.ts", "app/api/admin/incidents/route.ts", "app/api/admin/incidents/[id]/route.ts",
+    "app/admin/page.tsx", "app/page.tsx", "app/incidents/[id]/page.tsx",
+    "components/admin-incident-dialog.tsx", "components/admin-incident-delete-dialog.tsx",
+    "components/admin-history-incident-dialog.tsx", "components/history-bars.tsx", "components/history-chart.tsx",
+    "components/incident-card.tsx", "components/incident-row.tsx"
   ],
   "include": []
 }

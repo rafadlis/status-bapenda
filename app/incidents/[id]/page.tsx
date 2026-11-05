@@ -6,6 +6,9 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { SiteFooter, SiteHeader } from "@/components/site-header";
 import { PageLoading } from "@/components/page-loading";
+import { AdminIncidentDialog } from "@/components/admin-incident-dialog";
+import { AdminIncidentDeleteDialog } from "@/components/admin-incident-delete-dialog";
+import { isAdmin } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { incidents, incidentUpdates } from "@/lib/db/schema";
 import { kindLabel, stateLabel } from "@/lib/incident";
@@ -25,9 +28,7 @@ const getIncident = cache(async (rawId: string) => {
   if (!incident) notFound();
   const updates = await db.select().from(incidentUpdates).where(eq(incidentUpdates.incidentId, id))
     .orderBy(desc(incidentUpdates.createdAt), desc(incidentUpdates.id));
-  const latestMessage = updates[0]?.message || (incident.state === "resolved"
-    ? incident.kind === "maintenance" ? "Pemeliharaan telah selesai." : "Gangguan telah selesai."
-    : incident.message);
+  const latestMessage = updates[0]?.message || incident.message;
   return { incident, updates, latestMessage };
 });
 
@@ -77,6 +78,7 @@ export default function IncidentPage({ params }: IncidentProps) {
 
 async function IncidentContent({ params }: IncidentProps) {
   const { incident, updates, latestMessage } = await getIncident((await params).id);
+  const canManage = await isAdmin();
   const latest = updates[0];
   const latestAt = latest?.createdAt ?? incident.updatedAt;
   const affectedServices = getIncidentServices(incident.serviceKey);
@@ -122,11 +124,16 @@ async function IncidentContent({ params }: IncidentProps) {
   return <main className="site-width reference-incident-page">
     <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(jsonLd) }} />
     <nav className="reference-breadcrumb" aria-label="Jejak halaman"><Link href="/">Bapenda Garut</Link><span>/</span><Link href="/history">Riwayat</Link><span>/</span><span>{incident.title}</span></nav>
+    {canManage && <div className="incident-admin-actions">
+      <Link href="/admin">Kelola informasi</Link>
+      <AdminIncidentDialog id={incident.id} title={incident.title} description={incident.message} kind={incident.kind} state={incident.state} serviceKey={incident.serviceKey} affectedComponentKeys={incident.affectedComponentKeys} titleReviewRequired={incident.titleReviewRequired} />
+      <AdminIncidentDeleteDialog id={incident.id} title={incident.title} />
+    </div>}
 
     <section className={`incident-summary incident-summary-${stageClass}`} aria-labelledby="incident-title">
       <div className="incident-summary-title"><Link href="/history" aria-label="Kembali ke riwayat pembaruan">‹</Link><h1 id="incident-title">{incident.title}</h1></div>
       <div className="incident-summary-meta"><span>{stateLabel(incident.state)}</span><span aria-hidden="true">·</span><span>{kindLabel(incident.kind)} layanan</span></div>
-      <div className="incident-summary-body"><p>{latestMessage}</p><div><time dateTime={latestAt.toISOString()}>{formatJakarta(latestAt, { dateStyle: "full", timeStyle: "short" })} WIB</time><span aria-hidden="true">·</span><Link href="#pembaruan">Lihat semua pembaruan</Link></div></div>
+      <div className="incident-summary-body">{latestMessage && <p>{latestMessage}</p>}<div><time dateTime={latestAt.toISOString()}>{formatJakarta(latestAt, { dateStyle: "full", timeStyle: "short" })} WIB</time><span aria-hidden="true">·</span><Link href="#pembaruan">Lihat semua pembaruan</Link></div></div>
     </section>
 
     <section className="incident-detail-card" aria-labelledby="affected-title">
@@ -150,7 +157,7 @@ async function IncidentContent({ params }: IncidentProps) {
         const previous = updates[index - 1];
         return <article key={update.id} className={`incident-update update-${update.state === "resolved" ? "resolved" : maintenance ? "maintenance" : "active"}`}>
           <span className="incident-update-dot" aria-hidden="true" />
-          <div className="incident-update-content"><h3>{stateLabel(update.state)}</h3>{(update.message || update.state === "resolved") && <p>{update.message || (maintenance ? "Pemeliharaan telah selesai." : "Gangguan telah selesai.")}</p>}
+          <div className="incident-update-content"><h3>{stateLabel(update.state)}</h3>{update.message && <p>{update.message}</p>}
             <div className="incident-update-date"><time dateTime={update.createdAt.toISOString()}>{formatJakarta(update.createdAt, { dateStyle: "full", timeStyle: "short" })} WIB</time>{previous && <span>({elapsedLabel(previous.createdAt, update.createdAt)})</span>}</div>
           </div>
         </article>;

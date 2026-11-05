@@ -11,6 +11,7 @@ import { getHistoryRange } from "@/lib/history-range";
 import { incidentAffectsService } from "@/lib/incident-service";
 import { incidentAffectsMonitoring } from "@/lib/incident-components";
 import { getStatusData } from "@/lib/status";
+import { isAdmin } from "@/lib/auth";
 import { absoluteUrl, pageMetadata, serializeJsonLd, siteDescription, siteName } from "@/lib/seo";
 
 export const metadata: Metadata = {
@@ -52,7 +53,7 @@ async function SelectedRangeStatus({ searchParams }: HomeProps) {
 async function LiveStatus({ range }: { range: ReturnType<typeof getHistoryRange> }) {
   await connection();
   const now = new Date();
-  const data = await getStatusData(range, now);
+  const [data, canReport] = await Promise.all([getStatusData(range, now), isAdmin()]);
   const active = data.incidents.filter((incident) => incident.state !== "resolved");
   const monitoredIncidents = active.filter(incidentAffectsMonitoring);
   const serviceStatuses = data.services.map((service) => ({
@@ -68,7 +69,7 @@ async function LiveStatus({ range }: { range: ReturnType<typeof getHistoryRange>
   return <main className="site-width reference-main">
     <section className={`reference-overall overall-${state}`} aria-label="Kondisi layanan saat ini"><div className="reference-overall-head"><span className="reference-overall-icon" aria-hidden="true">{state === "operational" ? "✓" : state === "degraded" ? "!" : "?"}</span><h1>{copy.title}</h1></div><div className="reference-overall-body"><p>{copy.detail}</p>{monitoredIncidents[0] && <Link href={`/incidents/${monitoredIncidents[0].id}`}>{monitoredIncidents[0].title}</Link>}</div></section>
 
-    <HistoryChart services={serviceStatuses} components={data.components} selectedRange={range.key} now={now} />
+    <HistoryChart services={serviceStatuses} components={data.components} selectedRange={range.key} now={now} canReport={canReport} />
     <div className="reference-history-action"><Link href="/history">Lihat riwayat pembaruan</Link></div>
 
     {active.length > 0 && <section className="reference-updates" aria-labelledby="updates-title"><div className="reference-updates-heading"><h2 id="updates-title">Pembaruan terkini</h2><Link href="/history">Semua riwayat</Link></div><div>{active.map((incident) => <IncidentRow incident={incident} key={incident.id} />)}</div></section>}
