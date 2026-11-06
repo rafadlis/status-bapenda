@@ -13,7 +13,7 @@ export function IncidentCard({ incident, compact = false }: { incident: PublicIn
   return <article className={`incident-card ${incident.state === "resolved" ? "incident-done" : "incident-open"}`}>
     <div className="incident-card-meta"><span>{incidentServiceLabel(incident.serviceKey)} · {kindLabel(incident.kind)} · {stateLabel(incident.state)}</span><time dateTime={date.toISOString()}>{formatJakarta(date, { dateStyle: "medium", timeStyle: "short" })} WIB</time></div>
     <h3><Link href={`/incidents/${incident.id}`}>{incident.title}</Link></h3>
-    <p>{note}</p>
+    {note && <p>{note}</p>}
     {!compact && <Link className="text-link" href={`/incidents/${incident.id}`}>Baca kronologi <span aria-hidden="true">→</span></Link>}
   </article>;
 }

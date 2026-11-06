@@ -10,7 +10,6 @@ export const automaticIncidentPolicy = {
   minimumFailures: 3,
   maximumGapMinutes: 10,
   minimumSampleSeconds: 60,
-  recoveryMinutes: 10,
 } as const;
 
 type Observation = { serviceKey: string; ok: boolean };
@@ -49,8 +48,7 @@ export function buildIncidentObservationQuery(results: Observation[], at: Date) 
         ELSE monitor_incident_states.failure_count END,
       counted_at = CASE WHEN ${gap} OR EXCLUDED.ok <> monitor_incident_states.ok OR ${newSample}
         THEN EXCLUDED.checked_at ELSE monitor_incident_states.counted_at END,
-      incident_id = CASE WHEN EXCLUDED.ok AND NOT ${gap}
-        AND monitor_incident_states.healthy_since <= EXCLUDED.checked_at - make_interval(mins => ${automaticIncidentPolicy.recoveryMinutes})
+      incident_id = CASE WHEN NOT EXCLUDED.ok AND monitor_incident_states.ok
         THEN NULL ELSE monitor_incident_states.incident_id END
     WHERE monitor_incident_states.checked_at < EXCLUDED.checked_at`;
 }
@@ -83,7 +81,7 @@ export function buildIncidentPublicationQuery(at: Date) {
       INSERT INTO incidents (service_key, affected_component_keys, title, message, kind, state, created_at, updated_at, automatic, title_review_required)
       SELECT parent, CASE WHEN parent IN (${sql.join(componentServices.map((service) => sql`${service.key}`), sql`, `)}) THEN keys END,
         'Gangguan terdeteksi pada ' || parent_name,
-        'Pemantauan otomatis mencatat kegagalan berulang selama sedikitnya 10 menit pada ' || names || '. Penyebab belum dikonfirmasi. Pengelola perlu memeriksa gangguan dan memperbarui informasi ini.',
+        '',
         'incident', 'investigating', started_at, ${at}::timestamptz, true, true FROM grouped
       RETURNING id, service_key, state, message
     ), additions AS (
@@ -95,7 +93,7 @@ export function buildIncidentPublicationQuery(at: Date) {
       ), updated_at = ${at}::timestamptz
       FROM additions WHERE incident.id = additions.existing_id AND incident.affected_component_keys IS NOT NULL
         AND NOT incident.affected_component_keys @> additions.keys
-      RETURNING incident.id, incident.state, 'Pemantauan otomatis juga mengonfirmasi gangguan pada ' || additions.names || '. Pengelola perlu memperbarui informasi dampaknya.' AS message
+      RETURNING incident.id, incident.state, ''::text AS message
     ), announced AS (
       INSERT INTO incident_updates (incident_id, state, message, created_at)
       SELECT id, state, message, ${at}::timestamptz FROM created
@@ -109,17 +107,45 @@ export function buildIncidentPublicationQuery(at: Date) {
       (SELECT count(*)::int FROM announced) AS updates`;
 }
 
+export function buildIncidentRecoveryQuery(at: Date) {
+  const values = sql.join(catalog.map((item) => sql`(${item.key}::text, ${item.parent}::text)`), sql`, `);
+  return sql`WITH catalog(key, parent) AS (VALUES ${values}), recovered AS (
+    SELECT incident.id FROM incidents AS incident
+    JOIN catalog ON catalog.parent = incident.service_key AND (
+      incident.affected_component_keys IS NULL OR incident.affected_component_keys ? catalog.key
+      OR (catalog.key = 'sapada-qris-generate' AND incident.affected_component_keys ? ${legacyQrisComponent.key})
+      OR (catalog.key IN (${sql.join(paymentComponentKeys.map((key) => sql`${key}`), sql`, `)})
+        AND incident.affected_component_keys ? ${legacyPaymentComponent.key})
+    )
+    LEFT JOIN monitor_incident_states AS state ON state.service_key = catalog.key
+    WHERE incident.automatic AND incident.kind = 'incident' AND incident.state <> 'resolved' AND incident.created_at <= ${at}::timestamptz
+    GROUP BY incident.id
+    HAVING count(state.service_key) = count(*)
+      AND bool_and(state.ok AND state.checked_at <= ${at}::timestamptz
+        AND state.checked_at >= ${at}::timestamptz - make_interval(mins => ${automaticIncidentPolicy.maximumGapMinutes}))
+      AND bool_or(state.checked_at = ${at}::timestamptz)
+  ), closed AS (
+    UPDATE incidents AS incident SET state = 'resolved', resolved_at = ${at}::timestamptz, updated_at = GREATEST(incident.updated_at, ${at}::timestamptz)
+    FROM recovered WHERE incident.id = recovered.id RETURNING incident.id
+  ), announced AS (
+    INSERT INTO incident_updates (incident_id, state, message, created_at)
+    SELECT id, 'resolved', '', ${at}::timestamptz FROM closed RETURNING incident_id
+  ) SELECT count(*)::int AS resolved FROM announced`;
+}
+
 export async function processAutomaticIncidents(results: Observation[], at: Date) {
   const knownKeys = new Set(catalog.map((item) => item.key));
   const observations = [...new Map(results.filter((result) => knownKeys.has(result.serviceKey)).map((result) => [result.serviceKey, result])).values()];
-  if (!observations.length) return { created: 0, expanded: 0, updates: 0 };
+  if (!observations.length) return { created: 0, expanded: 0, resolved: 0, updates: 0 };
   const client = neon(process.env.DATABASE_URL!);
   const dialect = new PgDialect();
-  const queries = [automaticIncidentLock, buildIncidentObservationQuery(observations, at), buildIncidentPublicationQuery(at)].map((statement) => {
+  const queries = [automaticIncidentLock, buildIncidentObservationQuery(observations, at), buildIncidentRecoveryQuery(at), buildIncidentPublicationQuery(at)].map((statement) => {
     const query = dialect.sqlToQuery(statement);
     return client.query(query.sql, query.params);
   });
   // Separate statements see prior writes; the lock serializes concurrent cron invocations.
   const result = await client.transaction(queries, { isolationLevel: "ReadCommitted" });
-  return result[2][0] as { created: number; expanded: number; updates: number };
+  const publication = result[3][0] as { created: number; expanded: number; updates: number };
+  const { resolved } = result[2][0] as { resolved: number };
+  return { ...publication, resolved, updates: publication.updates + resolved };
 }

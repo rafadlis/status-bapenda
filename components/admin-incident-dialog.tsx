@@ -19,6 +19,7 @@ import { incidentStates, maintenanceStates, stateLabel } from "@/lib/incident";
 type AdminIncidentDialogProps = {
   id: number;
   title: string;
+  description: string;
   kind: string;
   state: string;
   serviceKey: string;
@@ -26,7 +27,7 @@ type AdminIncidentDialogProps = {
   titleReviewRequired?: boolean;
 };
 
-export function AdminIncidentDialog({ id, title, kind, state, serviceKey, affectedComponentKeys, titleReviewRequired }: AdminIncidentDialogProps) {
+export function AdminIncidentDialog({ id, title, description, kind, state, serviceKey, affectedComponentKeys, titleReviewRequired }: AdminIncidentDialogProps) {
   const options = (kind === "maintenance" ? maintenanceStates : incidentStates)
     .map((value) => ({ value, label: stateLabel(value) }));
   const incidentComponents = getIncidentComponents(serviceKey);
@@ -43,11 +44,13 @@ export function AdminIncidentDialog({ id, title, kind, state, serviceKey, affect
       <form className="admin-form admin-dialog-form" action={`/api/admin/incidents/${id}`} method="post">
         <label htmlFor={`title-${id}`}>Judul</label>
         <input id={`title-${id}`} name="title" defaultValue={title} maxLength={120} required aria-describedby={titleReviewRequired ? `title-hint-${id}` : undefined} />
-        {titleReviewRequired && <p id={`title-hint-${id}`} className="form-hint">Informasi ini dibuat otomatis. Ganti judul dengan ringkasan gangguan yang sudah diperiksa.</p>}
+        {titleReviewRequired && <p id={`title-hint-${id}`} className="form-hint">Informasi ini dibuat otomatis. Judul dan keterangan dapat dilengkapi setelah gangguan diperiksa, termasuk saat sudah selesai.</p>}
+        <label htmlFor={`description-${id}`}>Keterangan kejadian</label>
+        <textarea id={`description-${id}`} name="description" rows={3} maxLength={2000} defaultValue={description} placeholder="Opsional. Jelaskan apa yang terjadi pada waktu tersebut." />
         {incidentComponents.length > 0 && <AdminComponentCheckboxes serviceKey={serviceKey} defaultSelected={affectedComponentKeys ?? incidentComponents.map((component) => component.key)} />}
         <AdminSelect id={`state-${id}`} label="Tahap berikutnya" name="state" defaultValue={state} options={options} />
         <label htmlFor={`note-${id}`}>Catatan pembaruan</label>
-        <textarea id={`note-${id}`} name="message" rows={4} maxLength={2000} placeholder="Jelaskan perkembangan terbaru kepada publik. Boleh kosong jika hanya mengubah judul." />
+        <textarea id={`note-${id}`} name="message" rows={4} maxLength={2000} placeholder="Opsional. Tambahkan perkembangan terbaru kepada publik." />
         <DialogFooter className="admin-dialog-actions">
           <DialogClose render={<Button type="button" variant="outline" />}>Batal</DialogClose>
           <Button type="submit">Terbitkan pembaruan</Button>

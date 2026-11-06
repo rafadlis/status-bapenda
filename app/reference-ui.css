@@ -71,6 +71,12 @@ button.reference-components-toggle:focus-visible { outline: 2px solid #174b86; o
 .reference-uptime { white-space: nowrap; font-size: 12px; color: var(--reference-muted); }
 .reference-bars { display: grid; gap: 3px; height: 20px; margin-top: 11px; }
 .reference-bars-dense { gap: 1px; }
+.history-report-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; font-size: 11px; color: var(--reference-muted); }
+.history-bars-selecting { height: 30px; }
+.history-bars-selecting .reference-bar:not(.history-bar-selected)::before { opacity: .45; }
+.history-bar-selected::before { outline: 2px solid #174b86; outline-offset: 1px; }
+.history-report-selection { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; font-size: 12px; }
+.history-report-selection p { margin: 0; }
 .reference-bar { position: relative; display: block; min-width: 0; width: 100%; height: 100%; padding: 0; border: 0; cursor: pointer; }
 .reference-bar::before { content: ""; position: absolute; inset: 0; border-radius: 3px; background: var(--bar-color); }
 .reference-bar-good { --bar-color: var(--reference-green); background: var(--reference-green); }
